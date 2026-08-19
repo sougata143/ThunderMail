@@ -5,7 +5,7 @@ WORKDIR /app
 RUN apk add --no-cache openssl libc6-compat
 
 # Install dependencies with --ignore-scripts to prevent arbitrary script execution
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
 # Explicit allowlist of source and configuration files
@@ -25,7 +25,7 @@ RUN apk add --no-cache openssl libc6-compat
 
 ENV NODE_ENV=production
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 
 # Copy built artifacts and Prisma engine from builder

@@ -175,7 +175,6 @@ export const Reader: React.FC<ReaderProps> = ({
               </label>
               <div
                 id="raw-encrypted-session-key"
-                tabIndex={0}
                 className="bg-thunder-900 rounded-lg p-3 text-violet-300 break-all border border-white/10 max-h-24 overflow-y-auto"
               >
                 {message.encryptedSessionKey}
@@ -188,7 +187,6 @@ export const Reader: React.FC<ReaderProps> = ({
               </label>
               <div
                 id="raw-encrypted-subject"
-                tabIndex={0}
                 className="bg-thunder-900 rounded-lg p-3 text-slate-300 break-all border border-white/10"
               >
                 {message.encryptedSubject}
@@ -201,7 +199,6 @@ export const Reader: React.FC<ReaderProps> = ({
               </label>
               <div
                 id="raw-encrypted-body"
-                tabIndex={0}
                 className="bg-thunder-900 rounded-lg p-3 text-slate-300 break-all border border-white/10 max-h-48 overflow-y-auto"
               >
                 {message.encryptedBody}

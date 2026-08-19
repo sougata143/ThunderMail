@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies with --ignore-scripts to prevent arbitrary script execution
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 RUN npm ci --legacy-peer-deps --ignore-scripts
 
 # Explicit allowlist of source and config files (replaces insecure glob `COPY . ./`)
@@ -19,7 +19,9 @@ FROM nginx:alpine AS runner
 RUN touch /var/run/nginx.pid && \
     chown -R nginx:nginx /var/run/nginx.pid /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
 
-COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
+# Copy static web assets as root-owned read-only (unprivileged nginx cannot modify them)
+COPY --from=builder --chown=root:root /app/dist /usr/share/nginx/html
+RUN chmod -R 755 /usr/share/nginx/html
 
 RUN printf 'server {\n\
     listen 8080;\n\

@@ -67,9 +67,8 @@ export const KeyExportModal: React.FC<KeyExportModalProps> = ({
           </label>
           <div
             id="spki-public-key"
-            tabIndex={0}
             aria-label="Public Key Base64 Display"
-            className="bg-thunder-950 p-3 rounded-lg border border-white/10 font-mono text-[11px] text-violet-300 break-all max-h-32 overflow-y-auto focus:outline-none focus:ring-1 focus:ring-violet-500"
+            className="bg-thunder-950 p-3 rounded-lg border border-white/10 font-mono text-[11px] text-violet-300 break-all max-h-32 overflow-y-auto"
           >
             {publicKeyPem || 'Key not loaded'}
           </div>

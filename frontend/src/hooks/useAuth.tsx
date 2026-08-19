@@ -148,19 +148,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     lockSession();
   }, [lockSession]);
 
+  const contextValue = React.useMemo(
+    () => ({
+      user,
+      isAuthenticated: !!user,
+      isKeyUnlocked: isUnlocked,
+      loading,
+      error,
+      register,
+      login,
+      logout,
+    }),
+    [user, isUnlocked, loading, error, register, login, logout]
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isKeyUnlocked: isUnlocked,
-        loading,
-        error,
-        register,
-        login,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

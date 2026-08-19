@@ -41,7 +41,11 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <dialog
+      open
+      aria-labelledby="modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-transparent border-0 w-full h-full max-w-none max-h-none m-0"
+    >
       {/* Backdrop: non-interactive for screen readers (aria-hidden) with keyboard dismissal handled via Escape key & close button */}
       <div
         className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity animate-fade-in"
@@ -69,6 +73,6 @@ export const Modal: React.FC<ModalProps> = ({
 
         <div className="space-y-4">{children}</div>
       </div>
-    </div>
+    </dialog>
   );
 };
