@@ -1,0 +1,33 @@
+{
+  email admin@thundermail.local
+}
+
+:80, :443 {
+  # Security headers
+  header {
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    X-XSS-Protection "1; mode=block"
+    Referrer-Policy strict-origin-when-cross-origin
+    Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:;"
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    -Server
+  }
+
+  # Backend API
+  handle /api/* {
+    reverse_proxy backend:3001
+  }
+
+  # Frontend (SPA catch-all)
+  handle {
+    reverse_proxy frontend:80
+  }
+
+  encode gzip
+  log {
+    output stderr
+    format console
+  }
+}

@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment variables & local credentials
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor & OS files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Docker & Caddy persistent data
+postgres_data/
+caddy_data/
+caddy_config/
+
+# Test coverage
+coverage/
+
+# Scratch & Planning files (requested)
+implementation_plan.md
+INITIAL_SETUP.md
+task.md
+walkthrough.md

@@ -1,0 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Folder {
+  INBOX
+  SENT
+  DRAFTS
+  TRASH
+  SPAM
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  authHash           String    @map("auth_hash")
+  salt               String
+  publicKey          String    @map("public_key") @db.Text
+  encryptedPrivateKey String   @map("encrypted_private_key") @db.Text
+  keyIv              String    @map("key_iv")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  sentMessages       MailboxMessage[] @relation("SentMessages")
+  receivedMessages   MailboxMessage[] @relation("ReceivedMessages")
+
+  @@map("users")
+}
+
+model MailboxMessage {
+  id                          String   @id @default(uuid())
+  senderEmail                 String   @map("sender_email")
+  recipientEmail              String   @map("recipient_email")
+  folder                      Folder   @default(INBOX)
+  encryptedSessionKey         String   @map("encrypted_session_key") @db.Text
+  senderSessionKey            String   @map("sender_session_key") @db.Text
+  encryptedSubject            String   @map("encrypted_subject") @db.Text
+  encryptedBody               String   @map("encrypted_body") @db.Text
+  subjectIv                   String   @map("subject_iv")
+  bodyIv                      String   @map("body_iv")
+  encryptedAttachmentsMetadata String? @map("encrypted_attachments_metadata") @db.Text
+  isRead                      Boolean  @default(false) @map("is_read")
+  isE2ee                      Boolean  @default(true) @map("is_e2ee")
+  createdAt                   DateTime @default(now()) @map("created_at")
+
+  sender    User @relation("SentMessages", fields: [senderEmail], references: [email])
+  recipient User @relation("ReceivedMessages", fields: [recipientEmail], references: [email])
+
+  @@index([recipientEmail])
+  @@index([senderEmail])
+  @@index([createdAt])
+  @@map("mailbox_messages")
+}

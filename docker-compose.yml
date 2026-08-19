@@ -1,0 +1,85 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: thundermail_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: thundermail
+      POSTGRES_USER: ${POSTGRES_USER:-thundermail}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-thundermail_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-thundermail}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runner
+    container_name: thundermail_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-thundermail}:${POSTGRES_PASSWORD:-thundermail_secret}@db:5432/thundermail
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production_32_chars_min}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      SMTP_HOST: ${SMTP_HOST:-smtp.example.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@thundermail.local}
+      DOMAIN: ${DOMAIN:-thundermail.local}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app_network
+    expose:
+      - "3001"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: runner
+    container_name: thundermail_frontend
+    restart: unless-stopped
+    networks:
+      - app_network
+    expose:
+      - "80"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: thundermail_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  app_network:
+    driver: bridge
