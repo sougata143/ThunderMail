@@ -1,8 +1,9 @@
 {
-  email admin@thundermail.local
+  admin off
+  auto_https off
 }
 
-:80, :443 {
+:80 {
   # Security headers
   header {
     X-Content-Type-Options nosniff
@@ -11,7 +12,6 @@
     Referrer-Policy strict-origin-when-cross-origin
     Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:;"
     Permissions-Policy "camera=(), microphone=(), geolocation=()"
-    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     -Server
   }
 

@@ -2,9 +2,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+RUN apk add --no-cache openssl libc6-compat
+
 # Install dependencies
 COPY package.json package-lock.json* ./
-RUN npm ci --frozen-lockfile
+RUN npm ci
 
 # Copy source and build
 COPY tsconfig.json ./
@@ -18,19 +20,22 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+RUN apk add --no-cache openssl libc6-compat
+
 ENV NODE_ENV=production
 
-# Only install production deps
 COPY package.json package-lock.json* ./
-RUN npm ci --frozen-lockfile --omit=dev
+RUN npm ci --omit=dev
 
-# Copy built artifacts
+# Copy built artifacts and Prisma engine from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY prisma ./prisma/
 
-# Run migrations and start server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# Push database schema on startup and launch server
+CMD ["sh", "-c", "./node_modules/.bin/prisma db push --skip-generate && node dist/server.js"]
 
 EXPOSE 3001
 
