@@ -6,8 +6,12 @@ import { deriveUMKRawBits, deriveAuthHash } from '../crypto/keyDerivation.ts';
 export function useAuth() {
   const { initializeNewAccount, unlockAccount, lockSession, isUnlocked } = useCrypto();
   const [user, setUser] = useState<UserPayload | null>(() => {
-    const saved = localStorage.getItem('tm_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('tm_user');
+      return saved ? (JSON.parse(saved) as UserPayload) : null;
+    } catch {
+      return null;
+    }
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,9 +123,16 @@ export function useAuth() {
     lockSession();
   }, [lockSession]);
 
+  // isAuthenticated: user data present in state + a JWT exists in storage.
+  // We do NOT gate on isUnlocked here to avoid a React setState race condition:
+  // unlockAccount() calls setPrivateKey() which is async; by the time AppContent
+  // re-renders, privateKey may not yet be reflected in isUnlocked even though the
+  // key IS loaded in memory. The mailbox itself can still read privateKey fine.
+  const hasJwt = !!localStorage.getItem('tm_jwt');
+
   return {
     user,
-    isAuthenticated: !!user && isUnlocked,
+    isAuthenticated: !!user && hasJwt,
     isKeyUnlocked: isUnlocked,
     loading,
     error,
