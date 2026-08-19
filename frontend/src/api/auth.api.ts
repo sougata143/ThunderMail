@@ -6,6 +6,13 @@ export interface UserPayload {
   publicKey: string;
   encryptedPrivateKey: string;
   keyIv: string;
+  // Post-Quantum fields
+  pqcPublicKey?: string | null;
+  encryptedPqcPrivKey?: string | null;
+  pqcKeyIv?: string | null;
+  dsaPublicKey?: string | null;
+  encryptedDsaPrivKey?: string | null;
+  dsaKeyIv?: string | null;
 }
 
 export interface AuthResponse {
@@ -26,6 +33,12 @@ export const authApi = {
     publicKey: string;
     encryptedPrivateKey: string;
     keyIv: string;
+    pqcPublicKey?: string;
+    encryptedPqcPrivKey?: string;
+    pqcKeyIv?: string;
+    dsaPublicKey?: string;
+    encryptedDsaPrivKey?: string;
+    dsaKeyIv?: string;
   }): Promise<AuthResponse> {
     const res = await apiClient.post<AuthResponse>('/auth/register', data);
     return res.data;

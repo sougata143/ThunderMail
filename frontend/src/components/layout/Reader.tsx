@@ -7,9 +7,13 @@ import {
   ShieldCheck,
   CheckCircle,
   Archive,
+  Cpu,
+  CheckCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '../ui/Button.tsx';
 import { Spinner } from '../ui/Spinner.tsx';
+import { AuthBadge } from '../ui/AuthBadge.tsx';
 import { useMailbox } from '../../hooks/useMailbox.ts';
 
 interface ReaderProps {
@@ -46,7 +50,7 @@ export const Reader: React.FC<ReaderProps> = ({
   if (isLoading) {
     return (
       <div className="flex-1 h-full flex items-center justify-center">
-        <Spinner size="lg" label="Decrypting in client memory (RSA-OAEP-4096 + AES-GCM-256)..." />
+        <Spinner size="lg" label="Decrypting in client memory (Hybrid ML-KEM-768 + RSA-4096 + AES-GCM-256)..." />
       </div>
     );
   }
@@ -130,7 +134,8 @@ export const Reader: React.FC<ReaderProps> = ({
           <h2 className="text-xl font-bold tracking-tight text-white">
             {message.decryptedSubject}
           </h2>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            {/* E2EE Mode Badge */}
             {message.isE2ee ? (
               <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-semibold">
                 <ShieldCheck className="w-4 h-4" />
@@ -141,6 +146,35 @@ export const Reader: React.FC<ReaderProps> = ({
                 Standard TLS Relay
               </span>
             )}
+
+            {/* Hybrid Post-Quantum Badge */}
+            {message.isPqc && (
+              <span className="inline-flex items-center gap-1.5 bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-xs font-semibold shadow-sm">
+                <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                Hybrid PQC (ML-KEM-768)
+              </span>
+            )}
+
+            {/* ML-DSA-65 Digital Signature Verification Badge */}
+            {message.signatureStatus === 'VERIFIED' && (
+              <span className="inline-flex items-center gap-1.5 bg-violet-500/10 text-violet-300 border border-violet-500/30 px-3 py-1 rounded-full text-xs font-semibold">
+                <CheckCheck className="w-3.5 h-3.5 text-violet-400" />
+                ML-DSA-65 Signed
+              </span>
+            )}
+            {message.signatureStatus === 'FAILED' && (
+              <span className="inline-flex items-center gap-1.5 bg-rose-500/10 text-rose-300 border border-rose-500/30 px-3 py-1 rounded-full text-xs font-semibold">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                Signature Verification Failed
+              </span>
+            )}
+
+            {/* Inbound Sender Authenticity (SPF/DKIM/DMARC) Badge */}
+            <AuthBadge
+              status={message.authStatus ?? 'NONE'}
+              detailsJson={message.authDetails}
+              isInternal={message.isE2ee && !message.authDetails}
+            />
           </div>
         </div>
 
@@ -171,7 +205,7 @@ export const Reader: React.FC<ReaderProps> = ({
 
             <div className="space-y-2">
               <label htmlFor="raw-encrypted-session-key" className="text-slate-400 font-semibold block">
-                RSA-OAEP Encrypted Session Key (Base64):
+                {message.isPqc ? 'Hybrid Wrapped Session Key (AES-GCM-256 with Hybrid KEK):' : 'RSA-OAEP Encrypted Session Key (Base64):'}
               </label>
               <div
                 id="raw-encrypted-session-key"
@@ -180,6 +214,48 @@ export const Reader: React.FC<ReaderProps> = ({
                 {message.encryptedSessionKey}
               </div>
             </div>
+
+            {message.isPqc && (
+              <>
+                <div className="space-y-2">
+                  <label htmlFor="raw-classic-ciphertext" className="text-slate-400 font-semibold block">
+                    Classical RSA-OAEP KEM Ciphertext (Base64):
+                  </label>
+                  <div
+                    id="raw-classic-ciphertext"
+                    className="bg-thunder-900 rounded-lg p-3 text-blue-300 break-all border border-white/10 max-h-24 overflow-y-auto"
+                  >
+                    {message.classicCiphertext}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="raw-pqc-ciphertext" className="text-slate-400 font-semibold block">
+                    Post-Quantum ML-KEM-768 Ciphertext (Base64, 1088 bytes):
+                  </label>
+                  <div
+                    id="raw-pqc-ciphertext"
+                    className="bg-thunder-900 rounded-lg p-3 text-indigo-300 break-all border border-white/10 max-h-24 overflow-y-auto"
+                  >
+                    {message.pqcCiphertext}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {message.senderSignature && (
+              <div className="space-y-2">
+                <label htmlFor="raw-sender-signature" className="text-slate-400 font-semibold block">
+                  Post-Quantum ML-DSA-65 Sender Signature (Base64, 3309 bytes):
+                </label>
+                <div
+                  id="raw-sender-signature"
+                  className="bg-thunder-900 rounded-lg p-3 text-emerald-300 break-all border border-white/10 max-h-24 overflow-y-auto"
+                >
+                  {message.senderSignature}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label htmlFor="raw-encrypted-subject" className="text-slate-400 font-semibold block">

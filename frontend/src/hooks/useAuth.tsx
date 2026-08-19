@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [lockSession]);
 
   /**
-   * Register: generate keys client-side, submit only the public verifier bundle.
+   * Register: generate hybrid keys client-side, submit public verifier & encrypted bundle.
    */
   const register = useCallback(
     async (email: string, pass: string) => {
@@ -69,6 +69,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           publicKey: keyBundle.publicKeyPem,
           encryptedPrivateKey: keyBundle.encryptedPrivateKey,
           keyIv: keyBundle.keyIv,
+          pqcPublicKey: keyBundle.pqcPublicKey,
+          encryptedPqcPrivKey: keyBundle.encryptedPqcPrivKey,
+          pqcKeyIv: keyBundle.pqcKeyIv,
+          dsaPublicKey: keyBundle.dsaPublicKey,
+          encryptedDsaPrivKey: keyBundle.encryptedDsaPrivKey,
+          dsaKeyIv: keyBundle.dsaKeyIv,
         });
         localStorage.setItem('tm_jwt', res.token);
         localStorage.setItem('tm_user', JSON.stringify(res.user));
@@ -89,7 +95,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
 
   /**
-   * Login: fetch salt → derive UMK/AuthHash → authenticate → unlock private key in RAM.
+   * Login: fetch salt → derive UMK/AuthHash → authenticate → unlock private keys in RAM.
    */
   const login = useCallback(
     async (email: string, pass: string) => {
@@ -104,10 +110,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const rawUmk = await deriveUMKRawBits(pass, salt);
         const authHash = await deriveAuthHash(rawUmk);
 
-        // 3. Authenticate — server returns JWT + encrypted key bundle
+        // 3. Authenticate — server returns JWT + encrypted key bundle (including PQC if provisioned)
         const res = await authApi.login({ email: normalizedEmail, authHash });
 
-        // 4. Decrypt private key into browser RAM using UMK
+        // 4. Decrypt private keys into browser RAM using UMK (lazily upgrading if PQC missing)
         await unlockAccount({
           password: pass,
           email: normalizedEmail,
@@ -115,6 +121,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           encryptedPrivateKey: res.user.encryptedPrivateKey,
           keyIv: res.user.keyIv,
           publicKeyPem: res.user.publicKey,
+          pqcPublicKey: res.user.pqcPublicKey,
+          encryptedPqcPrivKey: res.user.encryptedPqcPrivKey,
+          pqcKeyIv: res.user.pqcKeyIv,
+          dsaPublicKey: res.user.dsaPublicKey,
+          encryptedDsaPrivKey: res.user.encryptedDsaPrivKey,
+          dsaKeyIv: res.user.dsaKeyIv,
         });
 
         // 5. Persist JWT + user metadata (no secrets)
@@ -139,7 +151,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
 
   /**
-   * Logout: wipe JWT, user metadata, and private key from memory.
+   * Logout: wipe JWT, user metadata, and private keys from memory.
    */
   const logout = useCallback(() => {
     localStorage.removeItem('tm_jwt');

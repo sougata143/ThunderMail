@@ -1,4 +1,4 @@
-import { Folder } from '@prisma/client';
+import { AuthStatus, Folder, SignatureStatus } from '@prisma/client';
 import { prisma } from '../server.js';
 
 interface StoreMessageParams {
@@ -13,6 +13,16 @@ interface StoreMessageParams {
   encryptedAttachments?: string;
   isE2ee: boolean;
   folder?: keyof typeof Folder;
+  authStatus?: AuthStatus;
+  authDetails?: string | null;
+  // Hybrid PQC and Signature parameters
+  isPqc?: boolean;
+  classicCiphertext?: string | null;
+  pqcCiphertext?: string | null;
+  senderClassicCt?: string | null;
+  senderPqcCt?: string | null;
+  senderSignature?: string | null;
+  signatureStatus?: SignatureStatus;
 }
 
 export const mailService = {
@@ -34,7 +44,16 @@ export const mailService = {
         bodyIv: params.bodyIv,
         encryptedAttachmentsMetadata: params.encryptedAttachments ?? null,
         isE2ee: params.isE2ee,
+        isPqc: params.isPqc ?? false,
+        classicCiphertext: params.classicCiphertext ?? null,
+        pqcCiphertext: params.pqcCiphertext ?? null,
+        senderClassicCt: params.senderClassicCt ?? null,
+        senderPqcCt: params.senderPqcCt ?? null,
+        senderSignature: params.senderSignature ?? null,
+        signatureStatus: params.signatureStatus ?? SignatureStatus.UNSIGNED,
         isRead: false,
+        authStatus: params.authStatus ?? AuthStatus.NONE,
+        authDetails: params.authDetails ?? null,
       },
     });
   },

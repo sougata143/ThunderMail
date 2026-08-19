@@ -12,6 +12,9 @@ export interface EnvelopeSummary {
   senderSessionKey: string;
   isRead: boolean;
   isE2ee: boolean;
+  isPqc: boolean;
+  authStatus: 'PASS' | 'PARTIAL' | 'FAIL' | 'NONE';
+  signatureStatus: 'VERIFIED' | 'FAILED' | 'UNSIGNED';
   createdAt: string;
 }
 
@@ -29,6 +32,12 @@ export interface FullMessageRecord extends EnvelopeSummary {
   encryptedBody: string;
   bodyIv: string;
   encryptedAttachmentsMetadata?: string | null;
+  authDetails?: string | null;
+  classicCiphertext?: string | null;
+  pqcCiphertext?: string | null;
+  senderClassicCt?: string | null;
+  senderPqcCt?: string | null;
+  senderSignature?: string | null;
 }
 
 export const mailApi = {

@@ -25,11 +25,30 @@ export function useMailbox(folderName = 'INBOX', page = 1) {
 
         // Decrypt message content client-side
         if (msg.isE2ee) {
-          // Choose appropriate session key: if user is sender in SENT folder, use senderSessionKey
+          // Choose appropriate session key and KEM ciphertexts: if user is sender in SENT folder, use sender copies
           const isSentCopy = folderName === 'SENT' || msg.folder === 'SENT';
           const sessionKeyToUse = isSentCopy && msg.senderSessionKey
             ? msg.senderSessionKey
             : msg.encryptedSessionKey;
+
+          const classicCtToUse = isSentCopy && msg.senderClassicCt
+            ? msg.senderClassicCt
+            : msg.classicCiphertext;
+
+          const pqcCtToUse = isSentCopy && msg.senderPqcCt
+            ? msg.senderPqcCt
+            : msg.pqcCiphertext;
+
+          // If message is signed with ML-DSA-65, fetch sender's DSA public key to verify
+          let senderDsaPublicKey: string | null = null;
+          if (msg.senderSignature) {
+            try {
+              const senderKeyInfo = await keysApi.getPublicKey(msg.senderEmail);
+              senderDsaPublicKey = senderKeyInfo.dsaPublicKey ?? null;
+            } catch {
+              // Sender lookup failed
+            }
+          }
 
           const decrypted = await decryptMessage({
             encryptedSessionKey: sessionKeyToUse,
@@ -38,12 +57,18 @@ export function useMailbox(folderName = 'INBOX', page = 1) {
             subjectIv: msg.subjectIv,
             bodyIv: msg.bodyIv,
             encryptedAttachmentsMetadata: msg.encryptedAttachmentsMetadata,
+            isPqc: msg.isPqc,
+            classicCiphertext: classicCtToUse,
+            pqcCiphertext: pqcCtToUse,
+            senderSignature: msg.senderSignature,
+            senderDsaPublicKey,
           });
 
           return {
             ...msg,
             decryptedSubject: decrypted.subject,
             decryptedBody: decrypted.body,
+            signatureStatus: decrypted.signatureStatus,
           };
         }
 
@@ -51,6 +76,7 @@ export function useMailbox(folderName = 'INBOX', page = 1) {
           ...msg,
           decryptedSubject: msg.encryptedSubject,
           decryptedBody: msg.encryptedBody,
+          signatureStatus: 'UNSIGNED' as const,
         };
       },
       enabled: !!messageId && !!privateKey,
@@ -66,12 +92,13 @@ export function useMailbox(folderName = 'INBOX', page = 1) {
       // 1. Check if recipient exists for E2EE or fallback to TLS relay
       try {
         const keyInfo = await keysApi.getPublicKey(params.recipientEmail);
-        // Recipient found -> E2EE
+        // Recipient found -> Hybrid E2EE
         const encryptedPayload = await encryptMessage({
           recipientEmail: params.recipientEmail,
           subject: params.subject,
           body: params.body,
           recipientPublicKeyPem: keyInfo.publicKey,
+          recipientPqcPublicKey: keyInfo.pqcPublicKey,
         });
         return await mailApi.sendMail(encryptedPayload);
       } catch (err: unknown) {
@@ -87,6 +114,7 @@ export function useMailbox(folderName = 'INBOX', page = 1) {
             subjectIv: 'RELAY_IV',
             bodyIv: 'RELAY_IV',
             isE2ee: false,
+            isPqc: false,
             plaintextSubject: params.subject,
             plaintextBody: params.body,
           });

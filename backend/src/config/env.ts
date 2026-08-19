@@ -13,6 +13,9 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3001),
+  // Inbound email auth
+  INBOUND_PROVIDER: z.enum(['webhook', 'smtp']).default('webhook'),
+  INBOUND_WEBHOOK_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

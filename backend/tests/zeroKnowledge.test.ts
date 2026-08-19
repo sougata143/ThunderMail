@@ -7,10 +7,9 @@ import type { FastifyInstance } from 'fastify';
  * Zero-Knowledge Test Suite
  *
  * Verifies the core security invariant of ThunderMail:
- * NO plaintext message content is stored in the database.
+ * NO plaintext message content or unencrypted private keys are stored in the database.
  *
- * After registering users and sending messages, we inspect raw DB rows
- * to confirm only ciphertext blobs exist.
+ * Checks classical RSA, Hybrid ML-KEM-768 KEM, and ML-DSA-65 signature columns.
  */
 describe('Zero-Knowledge Invariants', () => {
   let app: FastifyInstance;
@@ -24,6 +23,12 @@ describe('Zero-Knowledge Invariants', () => {
     publicKey: 'mock-alice-public-key-' + 'x'.repeat(200),
     encryptedPrivateKey: 'enc-alice-private-' + 'x'.repeat(100),
     keyIv: Buffer.from('alice-iv-16bytes').toString('base64'),
+    pqcPublicKey: 'mock-alice-pqc-public-key-' + 'p'.repeat(200),
+    encryptedPqcPrivKey: 'enc-alice-pqc-private-' + 'p'.repeat(100),
+    pqcKeyIv: Buffer.from('alice-pqc-iv12b').toString('base64'),
+    dsaPublicKey: 'mock-alice-dsa-public-key-' + 'd'.repeat(200),
+    encryptedDsaPrivKey: 'enc-alice-dsa-private-' + 'd'.repeat(100),
+    dsaKeyIv: Buffer.from('alice-dsa-iv12b').toString('base64'),
   };
 
   const bob = {
@@ -33,6 +38,12 @@ describe('Zero-Knowledge Invariants', () => {
     publicKey: 'mock-bob-public-key-' + 'x'.repeat(200),
     encryptedPrivateKey: 'enc-bob-private-' + 'x'.repeat(100),
     keyIv: Buffer.from('bob-iv-16bytes!!').toString('base64'),
+    pqcPublicKey: 'mock-bob-pqc-public-key-' + 'p'.repeat(200),
+    encryptedPqcPrivKey: 'enc-bob-pqc-private-' + 'p'.repeat(100),
+    pqcKeyIv: Buffer.from('bob-pqc-iv-12b!').toString('base64'),
+    dsaPublicKey: 'mock-bob-dsa-public-key-' + 'd'.repeat(200),
+    encryptedDsaPrivKey: 'enc-bob-dsa-private-' + 'd'.repeat(100),
+    dsaKeyIv: Buffer.from('bob-dsa-iv-12b!').toString('base64'),
   };
 
   beforeAll(async () => {
@@ -71,7 +82,7 @@ describe('Zero-Knowledge Invariants', () => {
     await app.close();
   });
 
-  it('should register Alice without storing plaintext password', async () => {
+  it('should register Alice with PQC keys without storing plaintext passwords or raw private keys', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/auth/register',
@@ -89,14 +100,18 @@ describe('Zero-Knowledge Invariants', () => {
     expect(dbUser!.authHash).not.toContain('password');
     expect(dbUser!.authHash).not.toContain('secret');
 
-    // Must store the encrypted private key (not plaintext)
+    // Must store the encrypted private keys (not plaintext)
     expect(dbUser!.encryptedPrivateKey).toBe(alice.encryptedPrivateKey);
+    expect(dbUser!.encryptedPqcPrivKey).toBe(alice.encryptedPqcPrivKey);
+    expect(dbUser!.encryptedDsaPrivKey).toBe(alice.encryptedDsaPrivKey);
 
-    // Must store the public key (public by design)
+    // Must store public keys
     expect(dbUser!.publicKey).toBe(alice.publicKey);
+    expect(dbUser!.pqcPublicKey).toBe(alice.pqcPublicKey);
+    expect(dbUser!.dsaPublicKey).toBe(alice.dsaPublicKey);
   });
 
-  it('should register Bob', async () => {
+  it('should register Bob with PQC keys', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/auth/register',
@@ -107,12 +122,15 @@ describe('Zero-Knowledge Invariants', () => {
     bobToken = JSON.parse(res.body).token;
   });
 
-  it('should send E2EE message and store ONLY ciphertext in the database', async () => {
-    const PLAINTEXT_SUBJECT = 'TOP SECRET: Meeting at midnight';
-    const PLAINTEXT_BODY = 'Bring the documents to the usual location.';
+  it('should send Hybrid PQC E2EE message and store ONLY ciphertext in all columns without plaintext leaks', async () => {
+    const PLAINTEXT_SUBJECT = 'TOP SECRET: Quantum Key Delivery';
+    const PLAINTEXT_BODY = 'Lattice vectors validated under ML-KEM-768.';
 
     const ENCRYPTED_SUBJECT = 'CIPHERTEXT_SUBJECT_BLOB_' + Buffer.from(PLAINTEXT_SUBJECT).toString('base64');
     const ENCRYPTED_BODY = 'CIPHERTEXT_BODY_BLOB_' + Buffer.from(PLAINTEXT_BODY).toString('base64');
+    const CLASSIC_CT = 'CLASSIC_RSA_CT_' + 'c'.repeat(64);
+    const PQC_CT = 'ML_KEM_768_CT_' + 'q'.repeat(128);
+    const SENDER_SIG = 'ML_DSA_65_SIGNATURE_' + 's'.repeat(128);
 
     const res = await app.inject({
       method: 'POST',
@@ -120,20 +138,26 @@ describe('Zero-Knowledge Invariants', () => {
       headers: { authorization: `Bearer ${aliceToken}` },
       payload: {
         recipientEmail: bob.email,
-        encryptedSessionKey: 'RSA_OAEP_WRAPPED_SESSION_KEY_' + 'x'.repeat(64),
-        senderSessionKey: 'RSA_OAEP_SENDER_SESSION_KEY_' + 'x'.repeat(64),
+        encryptedSessionKey: 'HYBRID_WRAPPED_SESSION_KEY_' + 'k'.repeat(64),
+        senderSessionKey: 'HYBRID_WRAPPED_SENDER_KEY_' + 'k'.repeat(64),
         encryptedSubject: ENCRYPTED_SUBJECT,
         encryptedBody: ENCRYPTED_BODY,
         subjectIv: Buffer.from('subject-iv-12b').toString('base64'),
         bodyIv: Buffer.from('body-iv-12byte').toString('base64'),
         isE2ee: true,
+        isPqc: true,
+        classicCiphertext: CLASSIC_CT,
+        pqcCiphertext: PQC_CT,
+        senderClassicCt: CLASSIC_CT,
+        senderPqcCt: PQC_CT,
+        senderSignature: SENDER_SIG,
       },
     });
 
     expect(res.statusCode).toBe(201);
 
     // ── CORE ZERO-KNOWLEDGE ASSERTION ──────────────────────────────
-    // Inspect the database directly — must NOT contain plaintext
+    // Inspect the database directly — must NOT contain plaintext in ANY column
     const messages = await prisma.mailboxMessage.findMany({
       where: { recipientEmail: bob.email },
     });
@@ -141,18 +165,24 @@ describe('Zero-Knowledge Invariants', () => {
     expect(messages.length).toBeGreaterThan(0);
 
     for (const msg of messages) {
-      // The plaintext subject must NEVER appear in the DB
+      // The plaintext subject and body must NEVER appear in the DB
       expect(msg.encryptedSubject).not.toContain(PLAINTEXT_SUBJECT);
       expect(msg.encryptedBody).not.toContain(PLAINTEXT_BODY);
 
-      // Ciphertext blobs must be present
-      expect(msg.encryptedSubject.length).toBeGreaterThan(0);
-      expect(msg.encryptedBody.length).toBeGreaterThan(0);
-      expect(msg.encryptedSessionKey.length).toBeGreaterThan(0);
+      // Verify PQC columns contain ciphertext/signatures, not plaintext
+      expect(msg.isPqc).toBe(true);
+      expect(msg.classicCiphertext).toBe(CLASSIC_CT);
+      expect(msg.pqcCiphertext).toBe(PQC_CT);
+      expect(msg.senderSignature).toBe(SENDER_SIG);
+      expect(msg.signatureStatus).toBe('VERIFIED');
+
+      expect(msg.classicCiphertext).not.toContain(PLAINTEXT_BODY);
+      expect(msg.pqcCiphertext).not.toContain(PLAINTEXT_BODY);
+      expect(msg.senderSignature).not.toContain(PLAINTEXT_BODY);
     }
   });
 
-  it('should return encrypted blobs from the API (no plaintext in response)', async () => {
+  it('should return encrypted blobs and PQC metadata from folder API', async () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/mail/folder/INBOX',
@@ -166,13 +196,14 @@ describe('Zero-Knowledge Invariants', () => {
     for (const msg of messages) {
       // API response must not contain any plaintext message content
       const rawJson = JSON.stringify(msg);
-      expect(rawJson).not.toContain('TOP SECRET');
-      expect(rawJson).not.toContain('midnight');
-      expect(rawJson).not.toContain('documents');
+      expect(rawJson).not.toContain('Quantum Key Delivery');
+      expect(rawJson).not.toContain('Lattice vectors');
+      expect(msg.isPqc).toBe(true);
+      expect(msg.signatureStatus).toBe('VERIFIED');
     }
   });
 
-  it('should not expose private key in any API response', async () => {
+  it('should not expose raw private keys in user profile response', async () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/user/me',
@@ -182,9 +213,12 @@ describe('Zero-Knowledge Invariants', () => {
     expect(res.statusCode).toBe(200);
     const user = JSON.parse(res.body);
 
-    // Encrypted private key blob is returned (needed for client decryption)
-    // but it must be the ENCRYPTED version, not plaintext
+    // Encrypted private key blobs are returned for client-side decryption
     expect(user.encryptedPrivateKey).toBe(alice.encryptedPrivateKey);
+    expect(user.encryptedPqcPrivKey).toBe(alice.encryptedPqcPrivKey);
+    expect(user.encryptedDsaPrivKey).toBe(alice.encryptedDsaPrivKey);
+
     expect(user.encryptedPrivateKey).not.toContain('private_key_plaintext');
+    expect(user.encryptedPqcPrivKey).not.toContain('private_key_plaintext');
   });
 });

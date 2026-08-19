@@ -1,13 +1,13 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { Folder } from '@prisma/client';
+import { Folder, SignatureStatus } from '@prisma/client';
 import { prisma } from '../server.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { mailService } from '../services/mail.service.js';
 import { smtpRelayService } from '../services/smtpRelay.service.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────
-// For internal E2EE sends: require real session keys
+// For internal E2EE sends: require session keys & allow PQC/DSA metadata
 const e2eeMailSchema = z.object({
   recipientEmail: z.string().email(),
   encryptedSessionKey: z.string().min(32),
@@ -18,6 +18,14 @@ const e2eeMailSchema = z.object({
   bodyIv: z.string(),
   encryptedAttachments: z.string().optional(),
   isE2ee: z.literal(true).default(true),
+  // Hybrid Post-Quantum fields
+  isPqc: z.boolean().default(false),
+  classicCiphertext: z.string().optional(),
+  pqcCiphertext: z.string().optional(),
+  senderClassicCt: z.string().optional(),
+  senderPqcCt: z.string().optional(),
+  senderSignature: z.string().optional(),
+  signatureStatus: z.nativeEnum(SignatureStatus).default(SignatureStatus.UNSIGNED),
   plaintextSubject: z.string().optional(),
   plaintextBody: z.string().optional(),
 });
@@ -33,12 +41,18 @@ const relayMailSchema = z.object({
   bodyIv: z.string().default('RELAY_IV'),
   encryptedAttachments: z.string().optional(),
   isE2ee: z.literal(false),
+  isPqc: z.literal(false).default(false),
+  classicCiphertext: z.string().optional(),
+  pqcCiphertext: z.string().optional(),
+  senderClassicCt: z.string().optional(),
+  senderPqcCt: z.string().optional(),
+  senderSignature: z.string().optional(),
+  signatureStatus: z.nativeEnum(SignatureStatus).default(SignatureStatus.UNSIGNED),
   plaintextSubject: z.string().min(1),
   plaintextBody: z.string().min(1),
 });
 
 const sendMailSchema = z.discriminatedUnion('isE2ee', [e2eeMailSchema, relayMailSchema]);
-
 
 const patchStatusSchema = z.object({
   isRead: z.boolean().optional(),
@@ -101,6 +115,9 @@ export async function mailRoutes(app: FastifyInstance) {
             senderSessionKey: true,
             isRead: true,
             isE2ee: true,
+            isPqc: true,
+            authStatus: true,
+            signatureStatus: true,
             createdAt: true,
           },
         }),
@@ -166,7 +183,7 @@ export async function mailRoutes(app: FastifyInstance) {
     // Check if recipient exists on this server
     const recipient = await prisma.user.findUnique({
       where: { email: data.recipientEmail },
-      select: { publicKey: true, email: true },
+      select: { publicKey: true, pqcPublicKey: true, email: true },
     });
 
     let inboxMessage = null;
@@ -184,6 +201,13 @@ export async function mailRoutes(app: FastifyInstance) {
         bodyIv: data.bodyIv,
         encryptedAttachments: data.encryptedAttachments,
         isE2ee: true,
+        isPqc: data.isPqc,
+        classicCiphertext: data.classicCiphertext,
+        pqcCiphertext: data.pqcCiphertext,
+        senderClassicCt: data.senderClassicCt,
+        senderPqcCt: data.senderPqcCt,
+        senderSignature: data.senderSignature,
+        signatureStatus: data.senderSignature ? SignatureStatus.VERIFIED : SignatureStatus.UNSIGNED,
       });
     } else {
       // ── External SMTP relay ──
@@ -215,6 +239,13 @@ export async function mailRoutes(app: FastifyInstance) {
         bodyIv: data.bodyIv,
         encryptedAttachments: data.encryptedAttachments,
         isE2ee: true,
+        isPqc: data.isPqc,
+        classicCiphertext: data.senderClassicCt ?? data.classicCiphertext,
+        pqcCiphertext: data.senderPqcCt ?? data.pqcCiphertext,
+        senderClassicCt: data.senderClassicCt,
+        senderPqcCt: data.senderPqcCt,
+        senderSignature: data.senderSignature,
+        signatureStatus: data.senderSignature ? SignatureStatus.VERIFIED : SignatureStatus.UNSIGNED,
         folder: 'SENT',
       });
     }

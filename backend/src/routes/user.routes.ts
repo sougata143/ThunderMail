@@ -20,6 +20,13 @@ export async function userRoutes(app: FastifyInstance) {
         publicKey: true,
         encryptedPrivateKey: true,
         keyIv: true,
+        // PQC key material (encrypted at rest under UMK)
+        pqcPublicKey: true,
+        encryptedPqcPrivKey: true,
+        pqcKeyIv: true,
+        dsaPublicKey: true,
+        encryptedDsaPrivKey: true,
+        dsaKeyIv: true,
         createdAt: true,
         _count: {
           select: {
@@ -61,6 +68,13 @@ export async function userRoutes(app: FastifyInstance) {
       publicKey: user.publicKey,
       encryptedPrivateKey: user.encryptedPrivateKey,
       keyIv: user.keyIv,
+      // PQC key material for client-side unlock
+      pqcPublicKey: user.pqcPublicKey,
+      encryptedPqcPrivKey: user.encryptedPqcPrivKey,
+      pqcKeyIv: user.pqcKeyIv,
+      dsaPublicKey: user.dsaPublicKey,
+      encryptedDsaPrivKey: user.encryptedDsaPrivKey,
+      dsaKeyIv: user.dsaKeyIv,
       createdAt: user.createdAt,
       stats: {
         totalReceived: user._count.receivedMessages,

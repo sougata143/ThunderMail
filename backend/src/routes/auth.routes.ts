@@ -11,9 +11,17 @@ const registerSchema = z.object({
   email: z.string().email().transform((e) => e.trim().toLowerCase()),
   authHash: z.string().min(32),
   salt: z.string().min(16),
+  // Classical RSA-4096 Key Material
   publicKey: z.string().min(100),
   encryptedPrivateKey: z.string().min(32),
   keyIv: z.string().min(16),
+  // Post-Quantum ML-KEM-768 & ML-DSA-65 Key Material (optional during transition)
+  pqcPublicKey: z.string().optional(),
+  encryptedPqcPrivKey: z.string().optional(),
+  pqcKeyIv: z.string().optional(),
+  dsaPublicKey: z.string().optional(),
+  encryptedDsaPrivKey: z.string().optional(),
+  dsaKeyIv: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -53,7 +61,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   /**
    * POST /api/auth/register
-   * Stores the user's public key, encrypted private key, salt, and auth verifier.
+   * Stores the user's public keys, encrypted private keys, salt, and auth verifier.
    * The server NEVER sees the plaintext password or the User Master Key (UMK).
    */
   app.post(
@@ -70,7 +78,20 @@ export async function authRoutes(app: FastifyInstance) {
         });
       }
 
-      const { email, authHash, salt, publicKey, encryptedPrivateKey, keyIv } = body.data;
+      const {
+        email,
+        authHash,
+        salt,
+        publicKey,
+        encryptedPrivateKey,
+        keyIv,
+        pqcPublicKey,
+        encryptedPqcPrivKey,
+        pqcKeyIv,
+        dsaPublicKey,
+        encryptedDsaPrivKey,
+        dsaKeyIv,
+      } = body.data;
 
       const existing = await prisma.user.findUnique({
         where: { email },
@@ -88,6 +109,12 @@ export async function authRoutes(app: FastifyInstance) {
           publicKey,
           encryptedPrivateKey,
           keyIv,
+          pqcPublicKey: pqcPublicKey ?? null,
+          encryptedPqcPrivKey: encryptedPqcPrivKey ?? null,
+          pqcKeyIv: pqcKeyIv ?? null,
+          dsaPublicKey: dsaPublicKey ?? null,
+          encryptedDsaPrivKey: encryptedDsaPrivKey ?? null,
+          dsaKeyIv: dsaKeyIv ?? null,
         },
       });
 
@@ -104,6 +131,12 @@ export async function authRoutes(app: FastifyInstance) {
           publicKey: user.publicKey,
           encryptedPrivateKey: user.encryptedPrivateKey,
           keyIv: user.keyIv,
+          pqcPublicKey: user.pqcPublicKey,
+          encryptedPqcPrivKey: user.encryptedPqcPrivKey,
+          pqcKeyIv: user.pqcKeyIv,
+          dsaPublicKey: user.dsaPublicKey,
+          encryptedDsaPrivKey: user.encryptedDsaPrivKey,
+          dsaKeyIv: user.dsaKeyIv,
         },
       });
     },
@@ -112,7 +145,7 @@ export async function authRoutes(app: FastifyInstance) {
   /**
    * POST /api/auth/login
    * Verifies the auth hash (HMAC-SHA256 derived from UMK).
-   * Returns JWT + user encrypted key bundle so client can decrypt private key in browser.
+   * Returns JWT + user encrypted key bundle so client can decrypt private keys in browser.
    */
   app.post(
     '/login',
@@ -149,6 +182,12 @@ export async function authRoutes(app: FastifyInstance) {
           publicKey: user.publicKey,
           encryptedPrivateKey: user.encryptedPrivateKey,
           keyIv: user.keyIv,
+          pqcPublicKey: user.pqcPublicKey,
+          encryptedPqcPrivKey: user.encryptedPqcPrivKey,
+          pqcKeyIv: user.pqcKeyIv,
+          dsaPublicKey: user.dsaPublicKey,
+          encryptedDsaPrivKey: user.encryptedDsaPrivKey,
+          dsaKeyIv: user.dsaKeyIv,
         },
       };
     },

@@ -6,6 +6,7 @@ import { env } from './config/env.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { keysRoutes } from './routes/keys.routes.js';
 import { mailRoutes } from './routes/mail.routes.js';
+import { inboundRoutes } from './routes/inbound.routes.js';
 import { userRoutes } from './routes/user.routes.js';
 import { PrismaClient } from '@prisma/client';
 
@@ -51,6 +52,7 @@ export const buildApp = async () => {
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(keysRoutes, { prefix: '/api/keys' });
   await app.register(mailRoutes, { prefix: '/api/mail' });
+  await app.register(inboundRoutes, { prefix: '/api/mail/inbound' });
   await app.register(userRoutes, { prefix: '/api/user' });
 
   // ─── Health check ─────────────────────────────────────────────

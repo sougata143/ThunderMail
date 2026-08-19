@@ -10,6 +10,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AuthStatus {
+  PASS    // SPF ∧ DKIM ∧ DMARC all passed, domain-aligned
+  PARTIAL // some checks passed but DMARC absent or non-aligned
+  FAIL    // DMARC explicitly failed
+  NONE    // no authentication info (internal mail or pre-migration rows)
+}
+
+enum SignatureStatus {
+  VERIFIED  // Valid ML-DSA-65 signature matching sender's registered public key
+  FAILED    // Tampered payload or signature verification mismatch
+  UNSIGNED  // External relay or legacy unsigned message
+}
+
 enum Folder {
   INBOX
   SENT
@@ -19,39 +32,71 @@ enum Folder {
 }
 
 model User {
-  id                 String    @id @default(uuid())
-  email              String    @unique
-  authHash           String    @map("auth_hash")
-  salt               String
-  publicKey          String    @map("public_key") @db.Text
-  encryptedPrivateKey String   @map("encrypted_private_key") @db.Text
-  keyIv              String    @map("key_iv")
-  createdAt          DateTime  @default(now()) @map("created_at")
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  authHash            String    @map("auth_hash")
+  salt                String
 
-  sentMessages       MailboxMessage[] @relation("SentMessages")
-  receivedMessages   MailboxMessage[] @relation("ReceivedMessages")
+  // Classical RSA-OAEP-4096 Key Material
+  publicKey           String    @map("public_key") @db.Text
+  encryptedPrivateKey String    @map("encrypted_private_key") @db.Text
+  keyIv               String    @map("key_iv")
+
+  // Post-Quantum ML-KEM-768 (FIPS 203) Key Material
+  pqcPublicKey        String?   @map("pqc_public_key") @db.Text
+  encryptedPqcPrivKey String?   @map("encrypted_pqc_priv_key") @db.Text
+  pqcKeyIv            String?   @map("pqc_key_iv")
+
+  // Post-Quantum ML-DSA-65 (FIPS 204) Key Material
+  dsaPublicKey        String?   @map("dsa_public_key") @db.Text
+  encryptedDsaPrivKey String?   @map("encrypted_dsa_priv_key") @db.Text
+  dsaKeyIv            String?   @map("dsa_key_iv")
+
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  sentMessages        MailboxMessage[] @relation("SentMessages")
+  receivedMessages    MailboxMessage[] @relation("ReceivedMessages")
 
   @@map("users")
 }
 
 model MailboxMessage {
-  id                          String   @id @default(uuid())
-  senderEmail                 String   @map("sender_email")
-  recipientEmail              String   @map("recipient_email")
-  folder                      Folder   @default(INBOX)
-  encryptedSessionKey         String   @map("encrypted_session_key") @db.Text
-  senderSessionKey            String   @map("sender_session_key") @db.Text
-  encryptedSubject            String   @map("encrypted_subject") @db.Text
-  encryptedBody               String   @map("encrypted_body") @db.Text
-  subjectIv                   String   @map("subject_iv")
-  bodyIv                      String   @map("body_iv")
-  encryptedAttachmentsMetadata String? @map("encrypted_attachments_metadata") @db.Text
-  isRead                      Boolean  @default(false) @map("is_read")
-  isE2ee                      Boolean  @default(true) @map("is_e2ee")
-  createdAt                   DateTime @default(now()) @map("created_at")
+  id                           String          @id @default(uuid())
+  senderEmail                  String          @map("sender_email")
+  recipientEmail               String          @map("recipient_email")
+  folder                       Folder          @default(INBOX)
 
-  sender    User @relation("SentMessages", fields: [senderEmail], references: [email])
-  recipient User @relation("ReceivedMessages", fields: [recipientEmail], references: [email])
+  // Hybrid Wrapped Session Keys
+  encryptedSessionKey          String          @map("encrypted_session_key") @db.Text
+  senderSessionKey             String          @map("sender_session_key") @db.Text
+
+  // Hybrid KEM Ciphertext Components
+  classicCiphertext            String?         @map("classic_ciphertext") @db.Text
+  pqcCiphertext                String?         @map("pqc_ciphertext") @db.Text
+  senderClassicCt              String?         @map("sender_classic_ct") @db.Text
+  senderPqcCt                  String?         @map("sender_pqc_ct") @db.Text
+
+  // Encrypted Payload (AES-256-GCM)
+  encryptedSubject             String          @map("encrypted_subject") @db.Text
+  encryptedBody                String          @map("encrypted_body") @db.Text
+  subjectIv                    String          @map("subject_iv")
+  bodyIv                       String          @map("body_iv")
+  encryptedAttachmentsMetadata String?         @map("encrypted_attachments_metadata") @db.Text
+
+  // Post-Quantum Digital Signature (ML-DSA-65)
+  senderSignature              String?         @map("sender_signature") @db.Text
+  signatureStatus              SignatureStatus @default(UNSIGNED) @map("signature_status")
+
+  // Metadata & Authenticity
+  isRead                       Boolean         @default(false) @map("is_read")
+  isE2ee                       Boolean         @default(true) @map("is_e2ee")
+  isPqc                        Boolean         @default(false) @map("is_pqc")
+  authStatus                   AuthStatus      @default(NONE) @map("auth_status")
+  authDetails                  String?         @map("auth_details") @db.Text
+  createdAt                    DateTime        @default(now()) @map("created_at")
+
+  sender                       User            @relation("SentMessages", fields: [senderEmail], references: [email])
+  recipient                    User            @relation("ReceivedMessages", fields: [recipientEmail], references: [email])
 
   @@index([recipientEmail])
   @@index([senderEmail])
