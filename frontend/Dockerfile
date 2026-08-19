@@ -1,19 +1,28 @@
-# Build stage
+# ─── Build stage ───────────────────────────────────────────────
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# Install dependencies with --ignore-scripts to prevent arbitrary script execution
 COPY package.json package-lock.json* ./
-RUN npm ci --legacy-peer-deps
+RUN npm ci --legacy-peer-deps --ignore-scripts
 
-COPY . ./
+# Explicit allowlist of source and config files (replaces insecure glob `COPY . ./`)
+COPY index.html vite.config.ts tsconfig.json tailwind.config.ts postcss.config.js ./
+COPY src ./src/
+
 RUN npm run build
 
-# Runner stage (Nginx)
+# ─── Runner stage (Nginx non-root) ─────────────────────────────
 FROM nginx:alpine AS runner
-COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Create required pid, cache, and log paths with non-root ownership
+RUN touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/run/nginx.pid /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
+
+COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
 
 RUN printf 'server {\n\
-    listen 80;\n\
+    listen 8080;\n\
     server_name localhost;\n\
 \n\
     location / {\n\
@@ -29,5 +38,8 @@ RUN printf 'server {\n\
     }\n\
 }\n' > /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
+# Switch to unprivileged non-root user
+USER nginx
+
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]

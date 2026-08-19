@@ -58,7 +58,7 @@ services:
     networks:
       - app_network
     expose:
-      - "80"
+      - "8080"
 
   caddy:
     image: caddy:2-alpine

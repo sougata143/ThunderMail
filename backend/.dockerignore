@@ -1,0 +1,29 @@
+# Ignore dependencies and build artifacts
+node_modules
+dist
+build
+*.tsbuildinfo
+
+# Ignore environment variables and secrets
+.env*
+*.env
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+
+# Ignore tests and test configs
+tests
+__tests__
+*.test.ts
+*.spec.ts
+coverage
+
+# Ignore logs and local IDE files
+*.log
+.vscode
+.idea
+.git
+.gitignore
