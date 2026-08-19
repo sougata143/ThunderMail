@@ -20,7 +20,7 @@ export async function keysRoutes(app: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { email: string } }>, reply: FastifyReply) => {
       const { email } = request.params;
 
-      if (!email || !email.includes('@')) {
+      if (!email?.includes('@')) {
         return reply.status(400).send({ error: 'Invalid email address.' });
       }
 

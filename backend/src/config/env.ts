@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  DATABASE_URL: z.string().url(),
-  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  DATABASE_URL: z.string().url().default(process.env.DATABASE_URL || 'postgresql://thundermail:change_me_strong_password_here@localhost:5433/thundermail'),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters').default(process.env.JWT_SECRET || 'test_jwt_secret_must_be_at_least_32_characters_long_12345'),
   JWT_EXPIRES_IN: z.string().default('7d'),
   SMTP_HOST: z.string().default(''),
   SMTP_PORT: z.coerce.number().default(587),
@@ -24,4 +24,6 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+process.env.DATABASE_URL = env.DATABASE_URL;
+process.env.JWT_SECRET = env.JWT_SECRET;
 export type Env = typeof env;

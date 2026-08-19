@@ -32,9 +32,9 @@ export const Composer: React.FC<ComposerProps> = ({
     setSubject(initialSubject);
   }, [initialTo, initialSubject]);
 
-  // Check if recipient has a registered public key for E2EE
+  // Check if recipient has a registered public key for E2EE with optional chaining
   useEffect(() => {
-    if (!to || !to.includes('@')) {
+    if (!to?.includes('@')) {
       setHasPublicKey(null);
       return;
     }
@@ -92,8 +92,10 @@ export const Composer: React.FC<ComposerProps> = ({
           )}
         </div>
         <button
+          type="button"
           onClick={onClose}
           className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+          aria-label="Close Composer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -144,7 +146,7 @@ export const Composer: React.FC<ComposerProps> = ({
             {statusMessage || (
               <span className="flex items-center gap-1.5 text-emerald-400">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                Browser WebCrypto API Ready
+                {' Browser WebCrypto API Ready'}
               </span>
             )}
           </div>

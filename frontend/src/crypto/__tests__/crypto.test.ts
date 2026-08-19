@@ -30,7 +30,7 @@ describe('ThunderMail Client-Side Cryptographic Protocol', () => {
     const authHash2 = await deriveAuthHash(raw2);
 
     expect(authHash1).toBe(authHash2);
-    expect(authHash1.length).toBe(64); // HMAC-SHA256 hex string length
+    expect(authHash1).toHaveLength(64); // HMAC-SHA256 hex string length
   });
 
   it('should encrypt and decrypt private key with UMK', async () => {

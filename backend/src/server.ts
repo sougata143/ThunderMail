@@ -68,8 +68,8 @@ export const buildApp = async () => {
   return app;
 };
 
-// ─── Start ───────────────────────────────────────────────────────
-const start = async () => {
+// ─── Start with top-level await ──────────────────────────────────
+if (env.NODE_ENV !== 'test') {
   try {
     const app = await buildApp();
     await app.listen({ port: env.PORT, host: '0.0.0.0' });
@@ -78,6 +78,5 @@ const start = async () => {
     console.error('Failed to start server:', err);
     process.exit(1);
   }
-};
+}
 
-start();

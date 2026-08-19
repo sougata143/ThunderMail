@@ -39,16 +39,18 @@ export const RecoveryPhraseModal: React.FC<RecoveryPhraseModalProps> = ({
             <strong className="font-semibold block mb-1">
               Store these 24 words in a secure, offline location.
             </strong>
-            Because ThunderMail is zero-knowledge, the server cannot reset your password or recover
-            your emails if you lose your credentials.
+            <p className="mt-1">
+              Because ThunderMail is zero-knowledge, the server cannot reset your password or recover
+              your emails if you lose your credentials.
+            </p>
           </div>
         </div>
 
-        {/* 24 Words Grid */}
+        {/* 24 Words Grid with stable unique key based on position and word */}
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 bg-thunder-950 p-4 rounded-xl border border-white/10 font-mono text-xs max-h-60 overflow-y-auto">
           {words.map((word, idx) => (
             <div
-              key={idx}
+              key={`${idx + 1}-${word}`}
               className="bg-white/5 px-2.5 py-1.5 rounded flex items-center justify-between text-slate-300 border border-white/5"
             >
               <span className="text-slate-500 text-[10px] select-none">{idx + 1}.</span>

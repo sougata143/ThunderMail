@@ -5,7 +5,6 @@ import { prisma } from '../server.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { mailService } from '../services/mail.service.js';
 import { smtpRelayService } from '../services/smtpRelay.service.js';
-import { cryptoService } from '../services/crypto.service.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────
 // For internal E2EE sends: require real session keys
@@ -72,8 +71,8 @@ export async function mailRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: 'Invalid folder name.' });
       }
 
-      const page = Math.max(1, parseInt(request.query.page ?? '1', 10));
-      const limit = Math.min(50, Math.max(1, parseInt(request.query.limit ?? '20', 10)));
+      const page = Math.max(1, Number.parseInt(request.query.page ?? '1', 10));
+      const limit = Math.min(50, Math.max(1, Number.parseInt(request.query.limit ?? '20', 10)));
       const skip = (page - 1) * limit;
 
       const { email } = request.user;

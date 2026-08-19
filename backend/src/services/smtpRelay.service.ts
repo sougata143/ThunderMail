@@ -53,7 +53,7 @@ export const smtpRelayService = {
       to: params.to,
       subject: params.subject,
       text: params.body,
-      html: `<div style="font-family:sans-serif;max-width:600px;">${params.body.replace(/\n/g, '<br>')}</div>`,
+      html: `<div style="font-family:sans-serif;max-width:600px;">${params.body.replaceAll('\n', '<br>')}</div>`,
       headers: {
         'X-Mailer': 'ThunderMail E2EE',
         'X-ThunderMail-External': 'true',

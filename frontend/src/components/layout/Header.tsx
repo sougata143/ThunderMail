@@ -36,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Action icons & status */}
       <div className="flex items-center gap-3">
         <button
+          type="button"
           onClick={onRefresh}
           className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
           title="Refresh Mailbox"

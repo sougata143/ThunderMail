@@ -108,6 +108,7 @@ export const MailList: React.FC<MailListProps> = ({
 
         return (
           <button
+            type="button"
             key={msg.id}
             onClick={() => onSelectMessage(msg.id)}
             className={`w-full text-left p-4 transition-all duration-150 relative group ${

@@ -170,28 +170,40 @@ export const Reader: React.FC<ReaderProps> = ({
             </div>
 
             <div className="space-y-2">
-              <label className="text-slate-400 font-semibold block">
+              <label htmlFor="raw-encrypted-session-key" className="text-slate-400 font-semibold block">
                 RSA-OAEP Encrypted Session Key (Base64):
               </label>
-              <div className="bg-thunder-900 rounded-lg p-3 text-violet-300 break-all border border-white/10 max-h-24 overflow-y-auto">
+              <div
+                id="raw-encrypted-session-key"
+                tabIndex={0}
+                className="bg-thunder-900 rounded-lg p-3 text-violet-300 break-all border border-white/10 max-h-24 overflow-y-auto"
+              >
                 {message.encryptedSessionKey}
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-slate-400 font-semibold block">
+              <label htmlFor="raw-encrypted-subject" className="text-slate-400 font-semibold block">
                 AES-GCM Encrypted Subject (Base64):
               </label>
-              <div className="bg-thunder-900 rounded-lg p-3 text-slate-300 break-all border border-white/10">
+              <div
+                id="raw-encrypted-subject"
+                tabIndex={0}
+                className="bg-thunder-900 rounded-lg p-3 text-slate-300 break-all border border-white/10"
+              >
                 {message.encryptedSubject}
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-slate-400 font-semibold block">
+              <label htmlFor="raw-encrypted-body" className="text-slate-400 font-semibold block">
                 AES-GCM Encrypted Body (Base64):
               </label>
-              <div className="bg-thunder-900 rounded-lg p-3 text-slate-300 break-all border border-white/10 max-h-48 overflow-y-auto">
+              <div
+                id="raw-encrypted-body"
+                tabIndex={0}
+                className="bg-thunder-900 rounded-lg p-3 text-slate-300 break-all border border-white/10 max-h-48 overflow-y-auto"
+              >
                 {message.encryptedBody}
               </div>
             </div>

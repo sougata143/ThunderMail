@@ -52,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
   return (
@@ -66,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <div>
             <h1 className="font-bold text-base tracking-tight text-white flex items-center gap-1.5">
-              ThunderMail
+              <span>ThunderMail</span>
               <span className="text-[10px] bg-violet-500/20 text-violet-300 font-mono px-1.5 py-0.5 rounded border border-violet-500/30">
                 E2EE
               </span>
@@ -91,6 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             const isActive = currentFolder.toUpperCase() === item.id;
             return (
               <button
+                type="button"
                 key={item.id}
                 onClick={() => onSelectFolder(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -114,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span className="flex items-center gap-1.5">
               <HardDrive className="w-3.5 h-3.5" />
-              Encrypted Storage
+              <span>Encrypted Storage</span>
             </span>
             <span className="font-mono text-[11px]">{usagePercent}%</span>
           </div>
@@ -135,21 +136,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="text-xs font-semibold text-slate-200 truncate">{userEmail}</span>
             <span className="text-[10px] text-emerald-400 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Keys in RAM
+              <span>Keys in RAM</span>
             </span>
           </div>
           <div className="flex items-center gap-1">
             <button
+              type="button"
               onClick={onOpenSettings}
               className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
               title="Security & Keys"
+              aria-label="Security and Key Management"
             >
               <Key className="w-4 h-4" />
             </button>
             <button
+              type="button"
               onClick={onLogout}
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
               title="Lock Session & Logout"
+              aria-label="Lock Session and Logout"
             >
               <LogOut className="w-4 h-4" />
             </button>

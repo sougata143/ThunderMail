@@ -64,7 +64,7 @@ export const AuthPage: React.FC = () => {
             <Shield className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            ThunderMail
+            <span>ThunderMail</span>
             <span className="text-[11px] bg-violet-500/20 text-violet-300 font-mono px-2 py-0.5 rounded border border-violet-500/30">
               Zero-Knowledge
             </span>

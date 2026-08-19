@@ -201,20 +201,32 @@ export const CryptoProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
   }, [privateKey]);
 
+  const contextValue = React.useMemo(
+    () => ({
+      privateKey,
+      publicKeyPem,
+      publicKey,
+      isUnlocked: !!privateKey,
+      initializeNewAccount,
+      unlockAccount,
+      encryptMessage,
+      decryptMessage,
+      lockSession,
+    }),
+    [
+      privateKey,
+      publicKeyPem,
+      publicKey,
+      initializeNewAccount,
+      unlockAccount,
+      encryptMessage,
+      decryptMessage,
+      lockSession,
+    ]
+  );
+
   return (
-    <CryptoContext.Provider
-      value={{
-        privateKey,
-        publicKeyPem,
-        publicKey,
-        isUnlocked: !!privateKey,
-        initializeNewAccount,
-        unlockAccount,
-        encryptMessage,
-        decryptMessage,
-        lockSession,
-      }}
-    >
+    <CryptoContext.Provider value={contextValue}>
       {children}
     </CryptoContext.Provider>
   );
