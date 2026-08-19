@@ -8,7 +8,8 @@ import { smtpRelayService } from '../services/smtpRelay.service.js';
 import { cryptoService } from '../services/crypto.service.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────
-const sendMailSchema = z.object({
+// For internal E2EE sends: require real session keys
+const e2eeMailSchema = z.object({
   recipientEmail: z.string().email(),
   encryptedSessionKey: z.string().min(32),
   senderSessionKey: z.string().min(32),
@@ -17,11 +18,28 @@ const sendMailSchema = z.object({
   subjectIv: z.string(),
   bodyIv: z.string(),
   encryptedAttachments: z.string().optional(),
-  isE2ee: z.boolean().default(true),
-  // For external non-E2EE sends: plaintext content for SMTP relay
+  isE2ee: z.literal(true).default(true),
   plaintextSubject: z.string().optional(),
   plaintextBody: z.string().optional(),
 });
+
+// For external relay sends: session keys are placeholder sentinels
+const relayMailSchema = z.object({
+  recipientEmail: z.string().email(),
+  encryptedSessionKey: z.string().default('RELAY_NO_KEY'),
+  senderSessionKey: z.string().default('RELAY_NO_KEY'),
+  encryptedSubject: z.string(),
+  encryptedBody: z.string(),
+  subjectIv: z.string().default('RELAY_IV'),
+  bodyIv: z.string().default('RELAY_IV'),
+  encryptedAttachments: z.string().optional(),
+  isE2ee: z.literal(false),
+  plaintextSubject: z.string().min(1),
+  plaintextBody: z.string().min(1),
+});
+
+const sendMailSchema = z.discriminatedUnion('isE2ee', [e2eeMailSchema, relayMailSchema]);
+
 
 const patchStatusSchema = z.object({
   isRead: z.boolean().optional(),
@@ -184,20 +202,23 @@ export async function mailRoutes(app: FastifyInstance) {
       });
     }
 
-    // Store a SENT copy for the sender
-    await mailService.storeInternalMessage({
-      senderEmail,
-      recipientEmail: senderEmail,
-      encryptedSessionKey: data.senderSessionKey, // sender's copy uses senderSessionKey
-      senderSessionKey: data.senderSessionKey,
-      encryptedSubject: data.encryptedSubject,
-      encryptedBody: data.encryptedBody,
-      subjectIv: data.subjectIv,
-      bodyIv: data.bodyIv,
-      encryptedAttachments: data.encryptedAttachments,
-      isE2ee: data.isE2ee,
-      folder: 'SENT',
-    });
+    // Store a SENT copy for the sender only for internal E2EE messages.
+    // For external relay we skip DB storage to avoid persisting plaintext sentinel values.
+    if (recipient) {
+      await mailService.storeInternalMessage({
+        senderEmail,
+        recipientEmail: senderEmail,
+        encryptedSessionKey: data.senderSessionKey,
+        senderSessionKey: data.senderSessionKey,
+        encryptedSubject: data.encryptedSubject,
+        encryptedBody: data.encryptedBody,
+        subjectIv: data.subjectIv,
+        bodyIv: data.bodyIv,
+        encryptedAttachments: data.encryptedAttachments,
+        isE2ee: true,
+        folder: 'SENT',
+      });
+    }
 
     return reply.status(201).send({
       message: 'Message sent successfully.',

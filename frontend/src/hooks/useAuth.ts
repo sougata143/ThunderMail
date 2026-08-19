@@ -123,16 +123,12 @@ export function useAuth() {
     lockSession();
   }, [lockSession]);
 
-  // isAuthenticated: user data present in state + a JWT exists in storage.
-  // We do NOT gate on isUnlocked here to avoid a React setState race condition:
-  // unlockAccount() calls setPrivateKey() which is async; by the time AppContent
-  // re-renders, privateKey may not yet be reflected in isUnlocked even though the
-  // key IS loaded in memory. The mailbox itself can still read privateKey fine.
-  const hasJwt = !!localStorage.getItem('tm_jwt');
-
+  // isAuthenticated is purely based on reactive user state.
+  // logout() calls setUser(null) which triggers a re-render and unmounts the mailbox.
+  // We do NOT gate on isUnlocked to avoid a React setState race condition on login.
   return {
     user,
-    isAuthenticated: !!user && hasJwt,
+    isAuthenticated: !!user,
     isKeyUnlocked: isUnlocked,
     loading,
     error,
