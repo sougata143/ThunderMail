@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authApi, type UserPayload } from '../api/auth.api.ts';
 import { useCrypto } from './useCrypto.tsx';
-import { keystore } from '../crypto/storage.ts';
 import { deriveUMKRawBits, deriveAuthHash } from '../crypto/keyDerivation.ts';
 
 export function useAuth() {
@@ -30,13 +29,14 @@ export function useAuth() {
     async (email: string, pass: string) => {
       setLoading(true);
       setError(null);
+      const normalizedEmail = email.trim().toLowerCase();
       try {
         // 1. Generate keys client-side
-        const keyBundle = await initializeNewAccount(pass, email);
+        const keyBundle = await initializeNewAccount(pass, normalizedEmail);
 
         // 2. Submit only the public key, encrypted private key, salt, and authHash
         const res = await authApi.register({
-          email,
+          email: normalizedEmail,
           authHash: keyBundle.authHash,
           salt: keyBundle.salt,
           publicKey: keyBundle.publicKeyPem,
@@ -63,57 +63,38 @@ export function useAuth() {
   );
 
   /**
-   * Login: fetch salt -> derive authHash & UMK -> unlock private key in memory -> authenticate.
+   * Login: fetch salt -> derive authHash & UMK -> authenticate -> unlock private key in RAM.
    */
   const login = useCallback(
     async (email: string, pass: string) => {
       setLoading(true);
       setError(null);
+      const normalizedEmail = email.trim().toLowerCase();
       try {
-        // 1. Fetch salt for email (anti-enumeration returns dummy if not found)
-        const salt = await authApi.getSalt(email);
+        // 1. Fetch salt for email from server
+        const salt = await authApi.getSalt(normalizedEmail);
 
-        // 2. Derive UMK & AuthHash, decrypt private key if cached or wait for login response
-        // First check IndexedDB cache
-        const cachedBundle = await keystore.getKeyBundle(email);
+        // 2. Derive UMK bits and AuthHash using the salt
+        const rawUmk = await deriveUMKRawBits(pass, salt);
+        const authHash = await deriveAuthHash(rawUmk);
 
-        if (cachedBundle) {
-          const { authHash } = await unlockAccount({
-            password: pass,
-            email,
-            salt: cachedBundle.salt,
-            encryptedPrivateKey: cachedBundle.encryptedPrivateKey,
-            keyIv: cachedBundle.keyIv,
-            publicKeyPem: cachedBundle.publicKeyPem,
-          });
+        // 3. Authenticate with server using AuthHash
+        const res = await authApi.login({ email: normalizedEmail, authHash });
 
-          const res = await authApi.login({ email, authHash });
-          localStorage.setItem('tm_jwt', res.token);
-          localStorage.setItem('tm_user', JSON.stringify(res.user));
-          setUser(res.user);
-          return { success: true, user: res.user };
-        } else {
-          // If no local cache, derive AuthHash using the salt from server
-          const rawUmk = await deriveUMKRawBits(pass, salt);
-          const authHash = await deriveAuthHash(rawUmk);
+        // 4. On successful login, unlock the private key into RAM using the user's encrypted key bundle
+        await unlockAccount({
+          password: pass,
+          email: normalizedEmail,
+          salt,
+          encryptedPrivateKey: res.user.encryptedPrivateKey,
+          keyIv: res.user.keyIv,
+          publicKeyPem: res.user.publicKey,
+        });
 
-          const res = await authApi.login({ email, authHash });
-
-          // Unlock private key with the response bundle
-          await unlockAccount({
-            password: pass,
-            email,
-            salt,
-            encryptedPrivateKey: res.user.encryptedPrivateKey,
-            keyIv: res.user.keyIv,
-            publicKeyPem: res.user.publicKey,
-          });
-
-          localStorage.setItem('tm_jwt', res.token);
-          localStorage.setItem('tm_user', JSON.stringify(res.user));
-          setUser(res.user);
-          return { success: true, user: res.user };
-        }
+        localStorage.setItem('tm_jwt', res.token);
+        localStorage.setItem('tm_user', JSON.stringify(res.user));
+        setUser(res.user);
+        return { success: true, user: res.user };
       } catch (err: unknown) {
         const message =
           (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||

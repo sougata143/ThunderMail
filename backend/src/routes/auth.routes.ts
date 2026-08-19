@@ -1,13 +1,14 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../server.js';
-import { env } from '../config/env.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────
-const saltSchema = z.object({ email: z.string().email() });
+const saltSchema = z.object({
+  email: z.string().email().transform((e) => e.trim().toLowerCase()),
+});
 
 const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().transform((e) => e.trim().toLowerCase()),
   authHash: z.string().min(32),
   salt: z.string().min(16),
   publicKey: z.string().min(100),
@@ -16,7 +17,7 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().transform((e) => e.trim().toLowerCase()),
   authHash: z.string().min(32),
 });
 
@@ -24,14 +25,13 @@ const loginSchema = z.object({
 export async function authRoutes(app: FastifyInstance) {
   /**
    * POST /api/auth/salt
-   * Returns the Argon2id/PBKDF2 salt for a given email.
-   * Used by the client BEFORE login to re-derive the UMK.
-   * Does NOT reveal if the email exists (returns dummy salt if not found to prevent enumeration).
+   * Returns the PBKDF2 salt for a given email (normalized to lowercase).
+   * Does NOT reveal if the email exists (returns deterministic dummy salt if not found).
    */
   app.post(
     '/salt',
     {
-      config: { rateLimit: { max: 20, timeWindow: '5 minutes' } },
+      config: { rateLimit: { max: 100, timeWindow: '5 minutes' } },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const body = saltSchema.safeParse(request.body);
@@ -39,13 +39,14 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: 'Invalid email address.' });
       }
 
+      const email = body.data.email;
       const user = await prisma.user.findUnique({
-        where: { email: body.data.email },
+        where: { email },
         select: { salt: true },
       });
 
-      // Return a deterministic dummy salt to prevent user enumeration
-      const salt = user?.salt ?? Buffer.from(body.data.email).toString('base64');
+      // Return real salt if user exists; otherwise deterministic dummy salt
+      const salt = user?.salt ?? Buffer.from(`thundermail_salt_${email}`).toString('base64').padEnd(44, '=');
       return { salt };
     },
   );
@@ -58,7 +59,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post(
     '/register',
     {
-      config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+      config: { rateLimit: { max: 20, timeWindow: '15 minutes' } },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const body = registerSchema.safeParse(request.body);
@@ -69,8 +70,10 @@ export async function authRoutes(app: FastifyInstance) {
         });
       }
 
+      const { email, authHash, salt, publicKey, encryptedPrivateKey, keyIv } = body.data;
+
       const existing = await prisma.user.findUnique({
-        where: { email: body.data.email },
+        where: { email },
       });
 
       if (existing) {
@@ -79,12 +82,12 @@ export async function authRoutes(app: FastifyInstance) {
 
       const user = await prisma.user.create({
         data: {
-          email: body.data.email,
-          authHash: body.data.authHash,
-          salt: body.data.salt,
-          publicKey: body.data.publicKey,
-          encryptedPrivateKey: body.data.encryptedPrivateKey,
-          keyIv: body.data.keyIv,
+          email,
+          authHash,
+          salt,
+          publicKey,
+          encryptedPrivateKey,
+          keyIv,
         },
       });
 
@@ -108,13 +111,13 @@ export async function authRoutes(app: FastifyInstance) {
 
   /**
    * POST /api/auth/login
-   * Verifies the auth hash (HMAC-SHA256 derived from UMK, NOT the UMK itself).
-   * Returns JWT + encrypted key bundle so client can decrypt private key in browser.
+   * Verifies the auth hash (HMAC-SHA256 derived from UMK).
+   * Returns JWT + user encrypted key bundle so client can decrypt private key in browser.
    */
   app.post(
     '/login',
     {
-      config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+      config: { rateLimit: { max: 50, timeWindow: '15 minutes' } },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const body = loginSchema.safeParse(request.body);
@@ -122,13 +125,14 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: 'Invalid credentials format.' });
       }
 
+      const { email, authHash } = body.data;
+
       const user = await prisma.user.findUnique({
-        where: { email: body.data.email },
+        where: { email },
       });
 
-      if (!user || user.authHash !== body.data.authHash) {
-        // Constant-time-like response to prevent timing attacks
-        await new Promise((r) => setTimeout(r, 200));
+      if (!user || user.authHash !== authHash) {
+        await new Promise((r) => setTimeout(r, 100));
         return reply.status(401).send({ error: 'Invalid email or password.' });
       }
 
