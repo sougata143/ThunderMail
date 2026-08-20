@@ -171,6 +171,6 @@ describe('ThunderMail Client-Side Cryptographic Protocol', () => {
     }).catch(() => null);
 
     // If decryption fails due to bad auth tag or signature verification fails:
-    expect(tamperedDecrypted?.signatureStatus !== 'VERIFIED').toBe(true);
+    expect(tamperedDecrypted?.signatureStatus).not.toBe('VERIFIED');
   });
 });

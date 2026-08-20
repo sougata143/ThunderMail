@@ -1,7 +1,46 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { mailApi, type FolderResponse } from '../api/mail.api.ts';
+import { mailApi, type FolderResponse, type FullMessageRecord } from '../api/mail.api.ts';
 import { keysApi } from '../api/keys.api.ts';
 import { useCrypto } from './useCrypto.ts';
+
+// ─── Helpers for Cognitive Complexity Reduction ───────────────────────────────
+
+/**
+ * Selects the appropriate session key and KEM ciphertexts based on whether
+ * the message is being viewed from the user's SENT folder copy.
+ */
+function resolveEnvelopeCiphertexts(msg: FullMessageRecord, activeFolder: string) {
+  const isSentCopy = activeFolder === 'SENT' || msg.folder === 'SENT';
+
+  const sessionKey = (isSentCopy && msg.senderSessionKey)
+    ? msg.senderSessionKey
+    : msg.encryptedSessionKey;
+
+  const classicCiphertext = (isSentCopy && msg.senderClassicCt)
+    ? msg.senderClassicCt
+    : msg.classicCiphertext;
+
+  const pqcCiphertext = (isSentCopy && msg.senderPqcCt)
+    ? msg.senderPqcCt
+    : msg.pqcCiphertext;
+
+  return { sessionKey, classicCiphertext, pqcCiphertext };
+}
+
+/**
+ * Fetches the sender's ML-DSA-65 public key when a signature is present.
+ */
+async function fetchSenderDsaKey(senderEmail: string, hasSignature: boolean): Promise<string | null> {
+  if (!hasSignature) return null;
+  try {
+    const senderKeyInfo = await keysApi.getPublicKey(senderEmail);
+    return senderKeyInfo.dsaPublicKey ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Main Hook ────────────────────────────────────────────────────────────────
 
 export function useMailbox(folderName = 'INBOX', page = 1) {
   const queryClient = useQueryClient();
@@ -23,60 +62,39 @@ export function useMailbox(folderName = 'INBOX', page = 1) {
         if (!messageId) return null;
         const msg = await mailApi.getMail(messageId);
 
-        // Decrypt message content client-side
-        if (msg.isE2ee) {
-          // Choose appropriate session key and KEM ciphertexts: if user is sender in SENT folder, use sender copies
-          const isSentCopy = folderName === 'SENT' || msg.folder === 'SENT';
-          const sessionKeyToUse = isSentCopy && msg.senderSessionKey
-            ? msg.senderSessionKey
-            : msg.encryptedSessionKey;
-
-          const classicCtToUse = isSentCopy && msg.senderClassicCt
-            ? msg.senderClassicCt
-            : msg.classicCiphertext;
-
-          const pqcCtToUse = isSentCopy && msg.senderPqcCt
-            ? msg.senderPqcCt
-            : msg.pqcCiphertext;
-
-          // If message is signed with ML-DSA-65, fetch sender's DSA public key to verify
-          let senderDsaPublicKey: string | null = null;
-          if (msg.senderSignature) {
-            try {
-              const senderKeyInfo = await keysApi.getPublicKey(msg.senderEmail);
-              senderDsaPublicKey = senderKeyInfo.dsaPublicKey ?? null;
-            } catch {
-              // Sender lookup failed
-            }
-          }
-
-          const decrypted = await decryptMessage({
-            encryptedSessionKey: sessionKeyToUse,
-            encryptedSubject: msg.encryptedSubject,
-            encryptedBody: msg.encryptedBody,
-            subjectIv: msg.subjectIv,
-            bodyIv: msg.bodyIv,
-            encryptedAttachmentsMetadata: msg.encryptedAttachmentsMetadata,
-            isPqc: msg.isPqc,
-            classicCiphertext: classicCtToUse,
-            pqcCiphertext: pqcCtToUse,
-            senderSignature: msg.senderSignature,
-            senderDsaPublicKey,
-          });
-
+        // Non-E2EE messages return plaintext directly
+        if (!msg.isE2ee) {
           return {
             ...msg,
-            decryptedSubject: decrypted.subject,
-            decryptedBody: decrypted.body,
-            signatureStatus: decrypted.signatureStatus,
+            decryptedSubject: msg.encryptedSubject,
+            decryptedBody: msg.encryptedBody,
+            signatureStatus: 'UNSIGNED' as const,
           };
         }
 
+        // Decrypt E2EE message content client-side
+        const { sessionKey, classicCiphertext, pqcCiphertext } = resolveEnvelopeCiphertexts(msg, folderName);
+        const senderDsaPublicKey = await fetchSenderDsaKey(msg.senderEmail, Boolean(msg.senderSignature));
+
+        const decrypted = await decryptMessage({
+          encryptedSessionKey: sessionKey,
+          encryptedSubject: msg.encryptedSubject,
+          encryptedBody: msg.encryptedBody,
+          subjectIv: msg.subjectIv,
+          bodyIv: msg.bodyIv,
+          encryptedAttachmentsMetadata: msg.encryptedAttachmentsMetadata,
+          isPqc: msg.isPqc,
+          classicCiphertext,
+          pqcCiphertext,
+          senderSignature: msg.senderSignature,
+          senderDsaPublicKey,
+        });
+
         return {
           ...msg,
-          decryptedSubject: msg.encryptedSubject,
-          decryptedBody: msg.encryptedBody,
-          signatureStatus: 'UNSIGNED' as const,
+          decryptedSubject: decrypted.subject,
+          decryptedBody: decrypted.body,
+          signatureStatus: decrypted.signatureStatus,
         };
       },
       enabled: !!messageId && !!privateKey,

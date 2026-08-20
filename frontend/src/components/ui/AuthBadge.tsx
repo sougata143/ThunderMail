@@ -14,7 +14,7 @@
  * (the existing E2EE badge already communicates trust for those messages).
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, ShieldAlert, ShieldX, Shield, X } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -36,6 +36,11 @@ interface AuthBadgeProps {
   detailsJson?: string | null;
   /** Pass true for @thundermail.local internal messages to suppress the badge entirely */
   isInternal?: boolean;
+}
+
+interface DetailRowProps {
+  label: string;
+  value: string | undefined;
 }
 
 // ─── Config per status ────────────────────────────────────────────────────────
@@ -83,15 +88,29 @@ const STATUS_CONFIG = {
   },
 } as const;
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Extracted helper replacing nested ternary for detail status text color.
+ */
+function getAuthColor(value: string | undefined): string {
+  switch (value) {
+    case 'pass':
+      return 'text-emerald-400';
+    case 'fail':
+      return 'text-rose-400';
+    case 'softfail':
+      return 'text-amber-400';
+    default:
+      return 'text-slate-400';
+  }
+}
+
 // ─── Detail row sub-component ─────────────────────────────────────────────────
 
-function DetailRow({ label, value }: { label: string; value: string | undefined }) {
+function DetailRow({ label, value }: Readonly<DetailRowProps>) {
   if (!value) return null;
-  const colour =
-    value === 'pass'   ? 'text-emerald-400' :
-    value === 'fail'   ? 'text-rose-400'    :
-    value === 'softfail' ? 'text-amber-400' :
-    'text-slate-400';
+  const colour = getAuthColor(value);
 
   return (
     <div className="flex items-center justify-between gap-4 text-[11px]">
@@ -103,12 +122,28 @@ function DetailRow({ label, value }: { label: string; value: string | undefined 
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export const AuthBadge: React.FC<AuthBadgeProps> = ({
+export const AuthBadge: React.FC<Readonly<AuthBadgeProps>> = ({
   status,
   detailsJson,
   isInternal = false,
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (showTooltip) {
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+    } else {
+      if (dialog.open) {
+        dialog.close();
+      }
+    }
+  }, [showTooltip]);
 
   // Internal messages (thundermail.local ↔ thundermail.local) always have NONE
   // and the E2EE badge already communicates trust — suppress the auth badge
@@ -127,7 +162,7 @@ export const AuthBadge: React.FC<AuthBadgeProps> = ({
   }
 
   const hasDetails =
-    details.spf || details.dkim || details.dmarc || details.alignment;
+    Boolean(details.spf || details.dkim || details.dmarc || details.alignment);
 
   return (
     <div className="relative inline-flex" id={`auth-badge-${status.toLowerCase()}`}>
@@ -150,66 +185,77 @@ export const AuthBadge: React.FC<AuthBadgeProps> = ({
         {cfg.label}
       </button>
 
-      {/* ── Detail tooltip panel ────────────────────────────────── */}
-      {showTooltip && (
-        <div
-          role="dialog"
-          aria-label="Authentication details"
-          className={`
-            absolute right-0 top-full mt-2 z-50
-            w-64 rounded-xl border shadow-2xl
-            ${cfg.tip_bg} ${cfg.tip_border}
-            p-4 space-y-3
-            animate-fade-in
-          `}
-        >
-          {/* Close button */}
-          <div className="flex items-start justify-between gap-2">
-            <p className={`text-xs font-semibold ${cfg.text}`}>
+      {/* ── Native Accessible Dialog Modal ──────────────────────── */}
+      <dialog
+        ref={dialogRef}
+        aria-label="Authentication details"
+        onClose={() => setShowTooltip(false)}
+        className={`
+          fixed m-auto z-50 backdrop:bg-black/60 backdrop:backdrop-blur-sm
+          w-80 max-w-[90vw] rounded-xl border shadow-2xl
+          ${cfg.tip_bg} ${cfg.tip_border}
+          p-5 space-y-3.5 text-left
+          animate-fade-in
+        `}
+      >
+        {/* Close button & Header */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Icon className={`w-4 h-4 ${cfg.text}`} aria-hidden="true" />
+            <p className={`text-sm font-semibold ${cfg.text}`}>
               {cfg.label}
             </p>
-            <button
-              type="button"
-              aria-label="Close authentication details"
-              onClick={() => setShowTooltip(false)}
-              className="text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
           </div>
-
-          {/* Explanation */}
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            {cfg.tooltip}
-          </p>
-
-          {/* Check results */}
-          {hasDetails && (
-            <div className={`border-t ${cfg.tip_border} pt-3 space-y-1.5`}>
-              <DetailRow label="SPF"       value={details.spf} />
-              <DetailRow label="DKIM"      value={details.dkim} />
-              <DetailRow label="DMARC"     value={details.dmarc} />
-              <DetailRow label="Alignment" value={details.alignment} />
-              {details.fromDomain && (
-                <div className="pt-1 border-t border-white/5 space-y-1">
-                  <DetailRow label="From domain"       value={details.fromDomain} />
-                  <DetailRow label="Return-Path domain" value={details.returnPathDomain} />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Warning for FAIL */}
-          {status === 'FAIL' && (
-            <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
-              <p className="text-[11px] text-rose-300 leading-relaxed">
-                ⚠️ <strong>Be careful</strong> — do not click links or attachments in this message
-                unless you can independently verify the sender.
-              </p>
-            </div>
-          )}
+          <button
+            type="button"
+            aria-label="Close authentication details"
+            onClick={() => setShowTooltip(false)}
+            className="text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-md hover:bg-white/10"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      )}
+
+        {/* Explanation */}
+        <p className="text-xs text-slate-300 leading-relaxed">
+          {cfg.tooltip}
+        </p>
+
+        {/* Check results */}
+        {hasDetails && (
+          <div className={`border-t ${cfg.tip_border} pt-3 space-y-2`}>
+            <DetailRow label="SPF"       value={details.spf} />
+            <DetailRow label="DKIM"      value={details.dkim} />
+            <DetailRow label="DMARC"     value={details.dmarc} />
+            <DetailRow label="Alignment" value={details.alignment} />
+            {details.fromDomain && (
+              <div className="pt-2 border-t border-white/10 space-y-1.5">
+                <DetailRow label="From domain"       value={details.fromDomain} />
+                <DetailRow label="Return-Path domain" value={details.returnPathDomain} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Warning for FAIL */}
+        {status === 'FAIL' && (
+          <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-3">
+            <p className="text-xs text-rose-300 leading-relaxed">
+              ⚠️ <strong>Security Warning:</strong> The sender identity could not be verified. Do not click links or download attachments in this message.
+            </p>
+          </div>
+        )}
+
+        <div className="pt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowTooltip(false)}
+            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium text-slate-200 transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      </dialog>
     </div>
   );
 };

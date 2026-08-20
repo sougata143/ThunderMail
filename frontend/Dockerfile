@@ -21,9 +21,10 @@ RUN touch /var/run/nginx.pid && \
 
 # Copy static web assets as root-owned read-only (unprivileged nginx cannot modify them)
 COPY --from=builder --chown=root:root /app/dist /usr/share/nginx/html
-RUN chmod -R 755 /usr/share/nginx/html
 
-RUN printf 'server {\n\
+# Set permissions and generate nginx configuration in a single chained layer
+RUN chmod -R 755 /usr/share/nginx/html && \
+    printf 'server {\n\
     listen 8080;\n\
     server_name localhost;\n\
 \n\
