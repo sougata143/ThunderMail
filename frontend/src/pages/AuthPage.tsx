@@ -5,6 +5,7 @@ import { Input } from '../components/ui/Input.tsx';
 import { RecoveryPhraseModal } from '../components/crypto/RecoveryPhraseModal.tsx';
 import { generateRecoveryPhrase } from '../crypto/storage.ts';
 import { useAuth } from '../hooks/useAuth.ts';
+import { APP_DOMAIN, formatAppEmail } from '../config/app.ts';
 
 export const AuthPage: React.FC = () => {
   const [isRegister, setIsRegister] = useState(false);
@@ -22,6 +23,7 @@ export const AuthPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
+    const formattedEmail = formatAppEmail(email);
 
     if (isRegister) {
       if (password !== confirmPassword) {
@@ -37,7 +39,7 @@ export const AuthPage: React.FC = () => {
       const words = generateRecoveryPhrase();
       setRecoveryWords(words);
 
-      const res = await register(email, password);
+      const res = await register(formattedEmail, password);
       setCryptoStatus(null);
 
       if (res.success) {
@@ -107,8 +109,8 @@ export const AuthPage: React.FC = () => {
           <div>
             <Input
               label="ThunderMail Address"
-              type="email"
-              placeholder="user@thundermail.local"
+              type="text"
+              placeholder={`user@${APP_DOMAIN}`}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

@@ -17,7 +17,7 @@ describe('Zero-Knowledge Invariants', () => {
   let bobToken: string;
 
   const alice = {
-    email: 'alice@test.thundermail.local',
+    email: 'alice@thundermail.sougatatech.com',
     authHash: 'a'.repeat(64),
     salt: Buffer.from('alice-salt-32bytes').toString('base64'),
     publicKey: 'mock-alice-public-key-' + 'x'.repeat(200),
@@ -32,7 +32,7 @@ describe('Zero-Knowledge Invariants', () => {
   };
 
   const bob = {
-    email: 'bob@test.thundermail.local',
+    email: 'bob@thundermail.sougatatech.com',
     authHash: 'b'.repeat(64),
     salt: Buffer.from('bob-salt-32bytes!!').toString('base64'),
     publicKey: 'mock-bob-public-key-' + 'x'.repeat(200),

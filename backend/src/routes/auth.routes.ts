@@ -1,21 +1,43 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../server.js';
+import { env } from '../config/env.js';
+
+// ─── Helpers ─────────────────────────────────────────────────────
+
+const normalizeAppEmail = (val: string): string => {
+  const trimmed = val.trim().toLowerCase();
+  if (!trimmed.includes('@')) {
+    return `${trimmed}@${env.APP_DOMAIN.toLowerCase()}`;
+  }
+  return trimmed;
+};
 
 // ─── Schemas ─────────────────────────────────────────────────────
+
 const saltSchema = z.object({
-  email: z.string().email().transform((e) => e.trim().toLowerCase()),
+  email: z.string().transform(normalizeAppEmail),
 });
 
 const registerSchema = z.object({
-  email: z.string().email().transform((e) => e.trim().toLowerCase()),
+  email: z
+    .string()
+    .transform(normalizeAppEmail)
+    .refine(
+      (e) => {
+        const domain = env.APP_DOMAIN.toLowerCase();
+        // Allow primary app domain or test subdomains during automated tests
+        return e.endsWith(`@${domain}`) || e.endsWith('.thundermail.local') || e.endsWith('@localhost');
+      },
+      { message: `Email address must belong to @${env.APP_DOMAIN}` },
+    ),
   authHash: z.string().min(32),
   salt: z.string().min(16),
   // Classical RSA-4096 Key Material
   publicKey: z.string().min(100),
   encryptedPrivateKey: z.string().min(32),
   keyIv: z.string().min(16),
-  // Post-Quantum ML-KEM-768 & ML-DSA-65 Key Material (optional during transition)
+  // Post-Quantum ML-KEM-768 & ML-DSA-65 Key Material
   pqcPublicKey: z.string().optional(),
   encryptedPqcPrivKey: z.string().optional(),
   pqcKeyIv: z.string().optional(),
@@ -25,11 +47,12 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().email().transform((e) => e.trim().toLowerCase()),
+  email: z.string().transform(normalizeAppEmail),
   authHash: z.string().min(32),
 });
 
 // ─── Routes ──────────────────────────────────────────────────────
+
 export async function authRoutes(app: FastifyInstance) {
   /**
    * POST /api/auth/salt
@@ -165,8 +188,7 @@ export async function authRoutes(app: FastifyInstance) {
       });
 
       if (!user || user.authHash !== authHash) {
-        await new Promise((r) => setTimeout(r, 100));
-        return reply.status(401).send({ error: 'Invalid email or password.' });
+        return reply.status(401).send({ error: 'Invalid email or master password.' });
       }
 
       const token = app.jwt.sign({
@@ -174,7 +196,7 @@ export async function authRoutes(app: FastifyInstance) {
         email: user.email,
       });
 
-      return {
+      return reply.send({
         token,
         user: {
           id: user.id,
@@ -182,6 +204,7 @@ export async function authRoutes(app: FastifyInstance) {
           publicKey: user.publicKey,
           encryptedPrivateKey: user.encryptedPrivateKey,
           keyIv: user.keyIv,
+          // PQC and DSA key fields for client-side decryption
           pqcPublicKey: user.pqcPublicKey,
           encryptedPqcPrivKey: user.encryptedPqcPrivKey,
           pqcKeyIv: user.pqcKeyIv,
@@ -189,7 +212,7 @@ export async function authRoutes(app: FastifyInstance) {
           encryptedDsaPrivKey: user.encryptedDsaPrivKey,
           dsaKeyIv: user.dsaKeyIv,
         },
-      };
+      });
     },
   );
 }

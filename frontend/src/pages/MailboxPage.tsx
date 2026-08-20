@@ -7,6 +7,7 @@ import { Composer } from '../components/layout/Composer.tsx';
 import { KeyExportModal } from '../components/crypto/KeyExportModal.tsx';
 import { useAuth } from '../hooks/useAuth.ts';
 import { useMailbox } from '../hooks/useMailbox.ts';
+import { APP_DOMAIN } from '../config/app.ts';
 
 export const MailboxPage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -61,7 +62,7 @@ export const MailboxPage: React.FC = () => {
         }}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLogout={logout}
-        userEmail={user?.email || 'user@thundermail.local'}
+        userEmail={user?.email || `user@${APP_DOMAIN}`}
       />
 
       {/* Main Mailbox Content Area */}

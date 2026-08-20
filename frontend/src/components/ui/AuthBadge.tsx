@@ -10,7 +10,7 @@
  *   FAIL    → Rose   "Auth Failed"      (DMARC explicitly failed — spoofing risk)
  *   NONE    → Shown only for external mail as slate "No Auth Info"
  *
- * Internal @thundermail.local mail always carries NONE and receives no badge
+ * Internal @thundermail.sougatatech.com mail always carries NONE and receives no badge
  * (the existing E2EE badge already communicates trust for those messages).
  */
 
@@ -34,7 +34,7 @@ interface AuthBadgeProps {
   status:      AuthStatus;
   /** JSON string from the authDetails DB column (may be null/undefined) */
   detailsJson?: string | null;
-  /** Pass true for @thundermail.local internal messages to suppress the badge entirely */
+  /** Pass true for internal domain messages to suppress the badge entirely */
   isInternal?: boolean;
 }
 
@@ -141,7 +141,7 @@ export const AuthBadge: React.FC<Readonly<AuthBadgeProps>> = ({
     }
   }, [showTooltip]);
 
-  // Internal messages (thundermail.local ↔ thundermail.local) always have NONE
+  // Internal messages (thundermail.sougatatech.com ↔ thundermail.sougatatech.com) always have NONE
   // and the E2EE badge already communicates trust — suppress the auth badge
   if (isInternal && status === 'NONE') return null;
 

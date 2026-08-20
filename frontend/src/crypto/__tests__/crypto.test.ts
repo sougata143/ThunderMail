@@ -102,7 +102,7 @@ describe('ThunderMail Client-Side Cryptographic Protocol', () => {
 
     // Alice encrypts for Bob using both Classical RSA + ML-KEM-768, and signs with ML-DSA-65
     const payload = await encryptMailMessage({
-      recipientEmail: 'bob@thundermail.local',
+      recipientEmail: 'bob@thundermail.sougatatech.com',
       subject: PLAINTEXT_SUBJECT,
       body: PLAINTEXT_BODY,
       recipientPublicKey: (await crypto.subtle.importKey(

@@ -47,9 +47,20 @@ export const smtpRelayService = {
       throw new Error('SMTP relay not configured. Contact your administrator.');
     }
 
+    // Enforce that sender domain matches the authenticated production domain
+    const appDomain = env.APP_DOMAIN;
+    const expectedDomainSuffix = `@${appDomain.toLowerCase()}`;
+    if (!params.from || !params.from.toLowerCase().endsWith(expectedDomainSuffix)) {
+      throw new Error(
+        `Invalid outbound sender domain: "${params.from}". External relay requires a verified @${appDomain} identity.`
+      );
+    }
+
+    const localPart = params.from.split('@')[0];
+    const displayName = `${localPart} (ThunderMail)`;
+
     await transport.sendMail({
-      from: `ThunderMail <${env.SMTP_FROM}>`,
-      replyTo: params.from,
+      from: `${displayName} <${params.from}>`,
       to: params.to,
       subject: params.subject,
       text: params.body,
