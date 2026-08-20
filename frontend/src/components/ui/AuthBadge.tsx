@@ -134,14 +134,10 @@ export const AuthBadge: React.FC<Readonly<AuthBadgeProps>> = ({
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    if (showTooltip) {
-      if (!dialog.open) {
-        dialog.showModal();
-      }
-    } else {
-      if (dialog.open) {
-        dialog.close();
-      }
+    if (showTooltip && !dialog.open) {
+      dialog.showModal();
+    } else if (!showTooltip && dialog.open) {
+      dialog.close();
     }
   }, [showTooltip]);
 
